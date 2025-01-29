@@ -1,0 +1,5 @@
+a.txt
+vectorstore
+.chainlit
+__pycache__
+chainlit*
