@@ -12,9 +12,12 @@ import torch
 
 # torch.cuda.is_available()
 
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+
 DB_FAISS_PATH = 'vectorstore/db_faiss'
 
-custom_prompt_template = custom_prompt_template = """You are a helpful AI assistant. Use ONLY the following context to answer the question.
+custom_prompt_template = """You are a helpful AI assistant. Use ONLY the following context to answer the question.
 If the answer is not in the context, just say "I don't know." Do not try to generate an answer.
 
 Context:
@@ -40,7 +43,7 @@ def set_custom_prompt():
 def retrieval_qa_chain(llm, prompt, db):
     qa_chain = RetrievalQA.from_chain_type(llm=llm,
                                        chain_type='stuff',
-                                       retriever=db.as_retriever(search_kwargs={'k': 2}),
+                                       retriever=db.as_retriever(search_kwargs={'k': 5}),
                                        return_source_documents=True,
                                        chain_type_kwargs={'prompt': prompt}
                                        )
@@ -49,10 +52,10 @@ def retrieval_qa_chain(llm, prompt, db):
 #Loading the Model
 def load_llm():
     model_id = "meta-llama/Llama-2-7b-chat-hf"  # Or any other HF model you prefer
-
+    # model_id = "meta-llama/Llama-3.2-3B"
     bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_compute_dtype="float16",
+    bnb_4bit_compute_dtype=torch.float16,
     bnb_4bit_use_double_quant=True,
     bnb_4bit_quant_type="nf4")
 
@@ -63,7 +66,9 @@ def load_llm():
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        temperature=0.6
+        temperature=0.4,
+        top_k=50,
+        top_p=0.95,
     )
 
     llm = HuggingFacePipeline(pipeline=pipe)
@@ -72,7 +77,7 @@ def load_llm():
 #QA Model Function
 def qa_bot():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2",
-                                       model_kwargs={'device': 'cuda'},)
+                                       model_kwargs={'device': 'cpu'},)
     db = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
     llm = load_llm()
     qa_prompt = set_custom_prompt()
